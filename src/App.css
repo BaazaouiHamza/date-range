@@ -1,0 +1,64 @@
+
+  
+  .CalendarDay__selected_span {
+    background: rgba(0, 143, 148, 0.2);
+    color: rgb(0, 143, 148);
+  }
+  .CalendarDay {
+    font-weight: 700;
+    border: 2px solid rgba(255, 255, 255, 1);
+    border-radius: 7px;
+  }
+  .CalendarDay:hover {
+    border: 0;
+  }
+  
+  
+  .CalendarDay__selected_start_no_selected_end {
+    background: linear-gradient(to bottom right, #b30000 50%, transparent 50%);
+    color: #82888a;
+  }
+  
+  .CalendarDay__selected_end_no_selected_start {
+    background: linear-gradient(to top left, #b30000 50%, transparent 50%);
+    color: #82888a;
+  }
+  
+  .CalendarDay__selected_start{
+    background: linear-gradient(to top left, rgb(0, 143, 148) 50%, transparent 50%);
+    color: black;
+  }
+  .CalendarDay__selected_end {
+    background: linear-gradient(to bottom right,  rgb(0, 143, 148)  50%, transparent 50%);
+    color: black;
+  }
+  .CalendarDay__highlighted_calendar{
+    background: linear-gradient(to top left, #b30000  49%, transparent 49%, transparent 51%,  #b30000 51%);
+    color: white;
+    pointer-events: none;
+  }
+  .CalendarDay__blocked_calendar {
+    background-color: #b30000;
+    pointer-events: none;
+  }
+  
+  .loading-indicator {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100vh; /* Adjust the height as needed */
+  }
+  
+  .spinner {
+    border: 8px solid rgba(0, 0, 0, 0.3);
+    border-top: 8px solid #3498db;
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    animation: spin 1s linear infinite;
+  }
+  
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }

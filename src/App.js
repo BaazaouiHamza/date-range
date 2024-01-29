@@ -1,187 +1,272 @@
-import React from 'react';
-import { DateRangePicker, SingleDatePicker, DayPickerRangeController } from 'react-dates';
-import 'react-dates/initialize';
-import 'react-dates/lib/css/_datepicker.css';
-import Moment from 'moment';
+import React, { useState, useEffect } from "react";
+import "react-dates/initialize";
+import "react-dates/lib/css/_datepicker.css";
+import "./App.css";
+import { CalendarDay, DateRangePicker } from "react-dates";
+import Moment from "moment";
+import { BlockedTd, CheckTd, Day, HighLightedTd } from "./styled";
 
+const App = (props) => {
+  const [startDate, setStartDate] = useState(null);
+  const [endDate, setEndDate] = useState(null);
+  const [focusedInput, setFocusedInput] = useState("startDate");
+  const [items, setItems] = useState([]);
+  const [isLoaded, setIsLoaded] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [currentDate, setCurrentDate] = useState(Moment());
 
-export default class App extends React.Component {
-  constructor(props) {
-    super(props);
-    this.state = {
-      startDate: null,
-      endDate: null,
-      focusedInput: "startDate",
-      items: [],
-      isLoaded: false,
-      error : "",
-      currentDate: Moment(),
-    };
-    this.changeDate.bind(this);
-    this.setDateRange.bind(this);
-    this.isOutsideRange.bind(this);
-    this.onFocusChange.bind(this);
-    this.onPrevMonths.bind(this);
-    this.onNextMonths.bind(this);
-    Moment.locale('fr');
-  }
-  changeDate({ startDateNew, endDateNew }) {
-    if(startDateNew){
-      if(this.isDayHighlighted(startDateNew)){
-        return false;
-      }
-    }
-    if(endDateNew){
-      if(this.isDayHighlighted(endDateNew)){
-        return false;
-      }
-    }
-    const { startDate, endDate } = this.state;
-    if (startDate && endDate) {
-      this.reset();
-      this.setState({ startDate: startDateNew, endDate: null, focusedInput: "endDate" })
+  const handleDatesChange = ({ startDate, endDate }) => {
+    // Check if the selected range includes any blocked dates
+    const isRangeOverBlockedDates = items.some(
+      ({ start, end }) =>
+        Moment(start).isBetween(startDate, endDate, "D", "[)") ||
+        Moment(end).isBetween(startDate, endDate, "D", "(]")
+    );
+
+    if (isRangeOverBlockedDates) {
+      // Adjust the start and end dates to prevent spanning over blocked dates
+      setStartDate(null);
+      setEndDate(null);
     } else {
-      this.setState({ startDate: startDateNew, endDate: endDateNew });
+      // No blocked dates in the selected range, set the dates as usual
+      setStartDate(startDate);
+      setEndDate(endDate);
     }
-    try {
-      this.props.config.setDateRange(startDateNew, endDateNew);
-    } catch (e) {
-      console.log(e);
-    }
-  }
-  setDateRange() {
-    const { startDate, endDate } = this.state;
-    try {
-      if (startDate && endDate) {
-        this.props.config.onSetDateRange(startDate, endDate);
-      } else {
-        this.props.config.onSetDateRangeFailed("please select date range!");
-      }
-    } catch (e) {
-      console.log(e);
-    }
-  }
-  isOutsideRange(day) {
-    let { startDate, endDate } = this.state;
-    
+  };
+
+  const isOutsideRange = (day) => {
     if (Moment().startOf("day") > day.startOf("day")) {
       return true;
     }
     if (startDate && !endDate) {
-      const closest = this.findClosestDate(startDate);
+      const closest = findClosestDate(startDate);
       return closest ? day.isAfter(closest) : closest;
     } else {
       return false;
     }
-  }
-  findClosestDate(date) {
-    const { items } = this.state;
+  };
+  const findClosestDate = (date) => {
     let closest = date;
-    items.forEach(element => {
+    items.forEach((element) => {
       const start = element.start;
       const startDate = Moment(start, "YYYY-MM-DD HH:mm:ss");
       if (startDate.startOf("day").format() == date.startOf("day").format()) {
         closest = startDate;
-      } else if (startDate.isAfter(date) && startDate.isBefore(closest)) {
+      } else if (
+        startDate &&
+        startDate.isAfter(date) &&
+        startDate.isBefore(closest)
+      ) {
         closest = startDate;
       } else if (startDate.isAfter(date) && closest == date) {
         closest = startDate;
       }
-      
     });
-    return (date == closest) ? false : closest;
-  }
-  isDayHighlighted(day) {
-    let { items } = this.state;
-    let reservedDay = false;
-    if (items) {
-      items.forEach(element => {
-        const start = element.start;
-        const end = element.end;
-        const startDate = Moment(start, "YYYY-MM-DD HH:mm:ss");
-        const endDate = Moment(end, "YYYY-MM-DD HH:mm:ss");
-        if (this.isDayReserved(day, startDate, endDate)) {
-          reservedDay = true;
-        }
-      });
-    }
-    return reservedDay;
-  }
-  isDayReserved(day, startDate, endDate) {
-    return day.isBetween(startDate, endDate, null, '[]');
-  }
-  reset() {
-    this.setState({ startDate: null, endDate: null, focusedInput: "startDate" })
-  }
-  onFocusChange(focusedInput) {
-    this.setState({ focusedInput: focusedInput || "startDate" })
-  }
+    return date == closest ? false : closest;
+  };
 
-  componentDidMount() {
-    console.log("componentDidMount");
-    this.loadItems();
-  }
-  loadItems(currentDateSet){
-    const { config } = this.props;
+  const reset = () => {
+    setStartDate(null);
+    setEndDate(null);
+    setFocusedInput("startDate");
+  };
+
+  const onFocusChange = (focusedInput) => {
+    setFocusedInput(focusedInput || "startDate");
+  };
+
+  const loadItems = (currentDateSet) => {
+    const { config } = props;
     const { url } = config;
-    let {currentDate} = this.state;
     currentDateSet = currentDateSet || currentDate;
-    console.log("currentDate :::", currentDateSet, currentDateSet.format("YYYY-M"));
 
     const firstDate = currentDateSet.startOf("month").format("YYYY-MM-DD");
-    const lastDate = currentDateSet.add(2, "months").startOf("month").format("YYYY-MM-DD");
-    this.setState({
-      isLoaded: false,
-    });
+    const lastDate = currentDateSet
+      .add(2, "months")
+      .startOf("month")
+      .format("YYYY-MM-DD");
+
+    setIsLoaded(false);
+
     fetch(`${url}?start=${firstDate}&end=${lastDate}`)
-      .then(res => res.json())
+      .then((res) => res.json())
       .then(
         (result) => {
-          this.setState({
-            isLoaded: true,
-            items: result
-          });
+          setItems(result);
+          setIsLoaded(true);
         },
         (error) => {
-          this.setState({
-            isLoaded: true,
-            error
-          });
+          setError(error);
+          setIsLoaded(true);
         }
-      )
-  }
-  onNextMonths(currentDate){
-    this.loadItems(currentDate);
-  }
-  onPrevMonths(currentDate){
-    this.loadItems(currentDate);
-  }
-  render() {
-    const { startDate, endDate, focusedInput, isLoaded, items } = this.state;
-    const { config } = this.props;
-    const { buttonSetDateRange, buttonClear } = config;
-    return <div className={"container-date-range"}>
+      );
+  };
+
+  const onNextMonths = (currentDate) => {
+    loadItems(currentDate);
+  };
+
+  const onPrevMonths = (currentDate) => {
+    loadItems(currentDate);
+  };
+
+  useEffect(() => {
+    Moment.locale("fr");
+    setIsLoading(false);
+    loadItems();
+    setIsLoading(true);
+  }, []);
+
+  const { buttonSetDateRange, buttonClear } = props.config;
+
+  const setDateRange = () => {
+    try {
+      if (startDate && endDate) {
+        props.config.onSetDateRange(startDate, endDate);
+      } else {
+        props.config.onSetDateRangeFailed("please select date range!");
+      }
+    } catch (e) {
+      console.log(e);
+    }
+  };
+
+  return (
+    <div className={"container-date-range"}>
       {isLoaded}
-      <DateRangePicker
-        disabled={!isLoaded}
-        startDateId={"field-start-id"}
-        endDateId={"field-end-id"}
-        startDate={startDate}
-        endDate={endDate}
-        onDatesChange={({ startDate, endDate }) => this.changeDate({ startDateNew: startDate, endDateNew: endDate })}
-        focusedInput={focusedInput}
-        onFocusChange={focusedInput => this.onFocusChange(focusedInput)}
-        numberOfMonths={3}
-        isDayHighlighted={(day) => this.isDayHighlighted(day)}
-        isOutsideRange={(day) => this.isOutsideRange(day)}
-        isDayBlocked={(day)=>this.isDayHighlighted(day)}
-        minimumNights={0}
-        enableOutsideDays={false}
-        onPrevMonthClick={(currentDate) => this.onNextMonths(currentDate)}
-        onNextMonthClick={(currentDate) => this.onPrevMonths(currentDate)}
-      />
-      {buttonSetDateRange && <button onClick={() => this.setDateRange()}>Set date range</button>}
-      {buttonClear && <button onClick={() => this.reset()}>Reset</button>}
+      {isLoading ? (
+        <DateRangePicker
+          startDate={startDate}
+          endDate={endDate}
+          disabled={!isLoaded}
+          startDateId={"field-start-id"}
+          endDateId={"field-end-id"}
+          onDatesChange={handleDatesChange}
+          focusedInput={focusedInput}
+          onFocusChange={(focusedInput) => onFocusChange(focusedInput)}
+          renderCalendarDay={({ day, modifiers, ...props }) => {
+            const blockedData = items.filter(({ start, end, color }) =>
+              day && day.isBetween(Moment(start), Moment(end), "D", "()")
+                ? { start, end, color }
+                : null
+            );
+
+            const isOutsideDay = day && day.isBefore(Moment());
+
+            if (blockedData.length > 0) {
+              return blockedData.map(({ start, end, color }) => (
+                <BlockedTd
+                  key={`${start}-${end}`}
+                  daySize={props.daySize}
+                  color={color}
+                  blocked={true}
+                  isOutsideDay={isOutsideDay}
+                  style={{ width: props.daySize, height: props.daySize }}
+                >
+                  <Day daySize={props.daySize}>
+                    <span>{day && day.format("D")}</span>
+                  </Day>
+                </BlockedTd>
+              ));
+            }
+            const matchingStartData = items.find(
+              ({ start }) => day && day.isSame(Moment(start), "D")
+            );
+            const matchingEndData = items.find(
+              ({ end }) => day && day.isSame(Moment(end), "D")
+            );
+
+            if (matchingStartData && matchingEndData) {
+              const color1 = matchingStartData.color;
+              const color2 = matchingEndData.color;
+
+              return (
+                <HighLightedTd
+                  key={`${matchingStartData.start}-${matchingEndData.end}`}
+                  daySize={props.daySize}
+                  color1={color1}
+                  color2={color2}
+                  isOutsideDay={isOutsideDay}
+                  style={{ width: props.daySize, height: props.daySize }}
+                >
+                  <Day daySize={props.daySize}>
+                    <span>{day && day.format("D")}</span>
+                  </Day>
+                </HighLightedTd>
+              );
+            }
+            const matchingData = items.find(
+              ({ start, end }) =>
+                (day && day.isSame(Moment(start), "D")) ||
+                (day && day.isSame(Moment(end), "D"))
+            );
+            if (matchingData) {
+              // Determine if it's the start or end date
+              const isStartDate =
+                day && day.isSame(Moment(matchingData.start), "D");
+              const selectedStart =
+                modifiers && modifiers.has("selected-start");
+              const selectedEnd = modifiers && modifiers.has("selected-end");
+              // Map CheckTd components for matching data where checkIn is true
+              return (
+                <CheckTd
+                  key={matchingData.start}
+                  daySize={props.daySize}
+                  color={matchingData.color}
+                  checkIn={isStartDate}
+                  isOutsideDay={isOutsideDay}
+                  style={{ width: props.daySize, height: props.daySize }}
+                  onClick={(event) =>
+                    props.onDayClick && props.onDayClick(day || Moment(), event)
+                  }
+                  selectedStart={selectedStart}
+                  selectedEnd={selectedEnd}
+                  onMouseEnter={(event) =>
+                    props.onDayMouseEnter &&
+                    props.onDayMouseEnter(day || Moment(), event)
+                  }
+                  onMouseLeave={(event) =>
+                    props.onDayMouseLeave &&
+                    props.onDayMouseLeave(day || Moment(), event)
+                  }
+                >
+                  <Day daySize={props.daySize}>
+                    <span>{day && day.format("D")}</span>
+                  </Day>
+                </CheckTd>
+              );
+            }
+
+            return <CalendarDay day={day} modifiers={modifiers} {...props} />;
+          }}
+          isOutsideRange={(day) => isOutsideRange(day)}
+          minimumNights={0}
+          enableOutsideDays={false}
+          onPrevMonthClick={(currentDate) => onNextMonths(currentDate)}
+          onNextMonthClick={(currentDate) => onPrevMonths(currentDate)}
+          showDefaultInputIcon
+          showClearDates
+          hideKeyboardShortcutsPanel
+          numberOfMonths={3}
+        />
+      ) : (
+        <div className="loading-indicator">
+          <div className="spinner"></div>
+        </div>
+      )}
+      {buttonSetDateRange && (
+        <button onClick={() => setDateRange(startDate, endDate)}>
+          Set date range
+        </button>
+      )}
+      {
+        buttonClear && (
+          <button onClick={() => reset()}>Reset</button>
+        ) /*maybe we dont need this button ? */
+      }
     </div>
-  }
-}
+  );
+};
+
+export default App;
